@@ -1,50 +1,56 @@
 package io.github.mudassir.shopifywinter18;
 
-import android.os.AsyncTask;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
+import android.util.Log;
+import android.widget.TextView;
 
-import com.google.gson.FieldNamingPolicy;
-import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
+import io.github.mudassir.shopifywinter18.model.LineItem;
+import io.github.mudassir.shopifywinter18.model.Order;
+import io.github.mudassir.shopifywinter18.task.FetchTask;
 
-import java.io.IOException;
+public class MainActivity extends AppCompatActivity implements FetchTask.Callback {
 
-import io.github.mudassir.shopifywinter18.model.Orders;
-import okhttp3.OkHttpClient;
-import okhttp3.Request;
-import okhttp3.Response;
-
-public class MainActivity extends AppCompatActivity {
+    public static final String TAG = MainActivity.class.getSimpleName();
+    public static final String JSON_URL = "https://shopicruit.myshopify.com/admin/orders.json?page=1&access_token=c32313df0d0ef512ca64d5b336a0d7c6";
+    private TextView result;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+
+        Log.v(TAG, "Start");
+
         setContentView(R.layout.activity_main);
-        new AsyncTask<Void, Void, Void>() {
+        result = (TextView) findViewById(R.id.result);
+        new FetchTask(this).execute(JSON_URL);
+    }
 
-            @Override
-            protected Void doInBackground(Void... params) {
-                try {
-                    OkHttpClient client = new OkHttpClient();
-                    Request request = new Request.Builder()
-                            .url("https://shopicruit.myshopify.com/admin/orders.json?page=1&access_token=c32313df0d0ef512ca64d5b336a0d7c6")
-                            .build();
+    /**
+     * Solving the problem
+     */
+    @Override
+    public void onFetchComplete(Order[] orders) {
+        Log.i(TAG, "Successful fetch and parse");
 
-                    Response response = client.newCall(request).execute();
-                    String responseString = response.body().string();
+        float totalSpent = 0f;
+        int totalSold = 0;
 
-                    Gson gson = new GsonBuilder()
-                            .serializeNulls()
-                            .setFieldNamingPolicy(FieldNamingPolicy.LOWER_CASE_WITH_UNDERSCORES)
-                            .create();
-                    Orders orders = gson.fromJson(responseString, Orders.class);
-                    System.out.println();
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
-                return null;
+        // Brute force
+        for(Order order : orders) {
+
+            // Use billing address to check name because other fields may not be reliable according to docs
+            if (order.getBillingAddress() != null && order.getBillingAddress().getName().equals("Napoleon Batz")) {
+                totalSpent += order.getTotalPrice();
             }
-        }.execute();
+
+            for(LineItem item : order.getLineItems()) {
+                if (item.getTitle().equals("Awesome Bronze Bag")) {
+                    totalSold ++;
+                }
+            }
+        }
+
+        result.setText(String.format("Total spent by Mr. Batz: $%.2f CAD\n\nTotal Bronze Bags sold: %d", totalSpent, totalSold));
     }
 }
